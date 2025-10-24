@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 聚宽JQData - 期货分钟数据下载到VeighNa数据库
+试用账号时间限制：2024-07-16 至 2025-07-23（当前时间的三个月前）
+每天下载量限制：100万条
 """
 
 from datetime import datetime, timedelta
+import os
 from jqdatasdk import *
 import pandas as pd
 from tqdm import tqdm
@@ -15,9 +18,15 @@ from vnpy.trader.constant import Exchange as VnExchange
 
 # ==================== 配置区 ====================
 
-# 1. JQData账号
-JQDATA_USERNAME = '13716539053'
-JQDATA_PASSWORD = 'Nealchan1001'
+# 1. JQData账号（从环境变量获取）
+JQDATA_USERNAME = os.getenv("JQDATA_USERNAME")
+JQDATA_PASSWORD = os.getenv("JQDATA_PASSWORD")
+
+if not JQDATA_USERNAME or not JQDATA_PASSWORD:
+    raise ValueError(
+        "未找到聚宽账号环境变量！\n"
+        "请先设置环境变量：\n"
+    )
 
 # 2. 要下载的期货品种（聚宽代码）
 FUTURES_SYMBOLS = [
