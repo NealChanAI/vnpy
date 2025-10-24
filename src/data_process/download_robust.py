@@ -1,19 +1,25 @@
 """
-健壮的期货全量数据下载程序
-- 处理NULL值
-- API频率限制自动等待
-- 断点续传
-- 完善的错误处理
+健壮的期货全量数据下载程序 日线数据 使用tushare接口
 """
 from datetime import datetime
 import time
 import json
+import os
 import pandas as pd
 import tushare as ts
 from vnpy.trader.object import BarData, Interval, Exchange
 from vnpy.trader.database import get_database
 
-TOKEN = "3bfb500c9f60ff3600868bb8ed8b7dead7d222cfd703a26ee916c7ae"
+# 从环境变量获取Tushare TOKEN
+TOKEN = os.getenv("TUSHARE_TOKEN")
+if not TOKEN:
+    raise ValueError(
+        "未找到 TUSHARE_TOKEN 环境变量！\n"
+        "请先设置环境变量：\n"
+        "  Windows (PowerShell): $env:TUSHARE_TOKEN='your_token_here'\n"
+        "  Windows (CMD): set TUSHARE_TOKEN=your_token_here\n"
+        "  Linux/Mac: export TUSHARE_TOKEN='your_token_here'"
+    )
 ts.set_token(TOKEN)
 
 LOG_FILE = "download_progress.log"
