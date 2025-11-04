@@ -40,11 +40,14 @@ class MACDBottomDeviationStrategy(bt.Strategy):
     def __init__(self):
         # 初始化MACD指标
         self.macd = bt.indicators.MACD(
-            self.data, period1=self.p.macd1, period2=self.p.macd2, periodsignal=self.p.macdsig
+            self.data,
+            period_me1=self.p.macd1,
+            period_me2=self.p.macd2,
+            period_signal=self.p.macdsig
         )
         self.dif = self.macd.macd
         self.dea = self.macd.signal
-        self.macd_hist = self.macd.histogram
+        self.macd_hist = self.dif - self.dea  # 正确计算MACD柱
 
         # 辅助指标：20日均线（趋势过滤）、成交量均值
         self.ma20 = bt.indicators.SimpleMovingAverage(self.data, period=20)
@@ -56,7 +59,8 @@ class MACDBottomDeviationStrategy(bt.Strategy):
 
     def next(self):
         # 1. 判断底背离（股价新低，DIF未新低，且股价跌幅达标）
-        if (self.data.low[0] < self.data.low[-1] < self.data.low[-2]  # 股价创2期新低
+        if (len(self.data) > 2 and
+            self.data.low[0] < self.data.low[-1] < self.data.low[-2]  # 股价创2期新低
             and self.dif[0] > self.dif[-1] > self.dif[-2]  # DIF创2期新高（底背离）
             and (self.data.low[-2] - self.data.low[0]) / self.data.low[-2] > self.p.dev_threshold):  # 跌幅达标
             self.bottom_deviation = True
@@ -71,7 +75,7 @@ class MACDBottomDeviationStrategy(bt.Strategy):
             and self.data.close[0] > self.ma20[0]  # 股价在20日均线上（趋势过滤）
             and self.data.volume[0] > self.vol_mean[0] * self.p.vol_multiplier  # 成交量放大
             and not self.position):  # 无持仓
-            self.buy(size=1)  # 买入（可调整仓位）
+            self.buy(size=100)  # 买入（可调整仓位, A股最小单位100）
 
         # 4. 止损：跌破回零轴低点下方1%
         if self.position:
@@ -84,7 +88,8 @@ class MACDBottomDeviationStrategy(bt.Strategy):
         # 5. 止盈：MACD顶背离 或 DIF下穿零轴
         if self.position:
             # 顶背离判断（股价新高，DIF未新高）
-            top_dev = (self.data.high[0] > self.data.high[-1] > self.data.high[-2]
+            top_dev = (len(self.data) > 2 and
+                       self.data.high[0] > self.data.high[-1] > self.data.high[-2]
                        and self.dif[0] < self.dif[-1] < self.dif[-2])
             # DIF下穿零轴
             cross_down_zero = self.dif[-1] > 0 and self.dif[0] < 0
@@ -101,19 +106,16 @@ def get_stock_data(ts_code, start_date, end_date):
     df['trade_date'] = pd.to_datetime(df['trade_date'])
     df.set_index('trade_date', inplace=True)
     df.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'vol': 'Volume'}, inplace=True)
+    # Tushare的vol单位是手，backtrader需要股数
+    df['Volume'] = df['Volume'] * 100
     df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+    df = df.iloc[::-1] # Tushare数据是降序的，需要反转为升序
     return bt.feeds.PandasData(dataname=df)
 
 if __name__ == '__main__':
     # 回测设置
     cerebro = bt.Cerebro()
-    # 加载数据（示例：A股某标的，需替换为自己的数据源）
-    # data = bt.feeds.YahooFinanceData(
-    #     dataname='600036.SS',  # 招商银行（示例）
-    #     fromdate=bt.datetime.datetime(2018, 1, 1),
-    #     todate=bt.datetime.datetime(2023, 12, 31),
-    #     adjclose=True  # 复权处理
-    # )
+
     # 添加股票数据（2018-2023年数据，可调整时间范围）
     data = get_stock_data(ts_code='600519.SH', start_date='20180101', end_date='20231231')
     cerebro.adddata(data)
@@ -121,12 +123,12 @@ if __name__ == '__main__':
     cerebro.addstrategy(MACDBottomDeviationStrategy)
     # 初始资金
     cerebro.broker.setcash(100000.0)
-    # 手续费设置（0.1%佣金，0.1%印花税）
-    # cerebro.broker.setcommission(commission=0.001, stamp_duty=0.001)
+    # 添加佣金
     cerebro.broker.addcommissioninfo(AShareCommission())
     # 运行回测
     print('初始资金：%.2f' % cerebro.broker.getvalue())
     cerebro.run()
     print('回测结束资金：%.2f' % cerebro.broker.getvalue())
+    print(f'累计收益：{(cerebro.broker.getvalue() - 100000) / 100000 * 100:.2f}%')
     # 绘制回测曲线
     cerebro.plot()
