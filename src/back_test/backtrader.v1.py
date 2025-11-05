@@ -19,7 +19,7 @@ pro = ts.pro_api()
 # A股佣金与印花税（仅卖出收取）
 class AShareCommission(bt.CommInfoBase):
     params = dict(
-        commission=0.0002,   # 佣金（双边）
+        commission=0.0003,   # 佣金（双边）
         stamp_duty=0.001,    # 印花税（单边，仅卖出）
         percabs=True,        # 按比例收费
         stocklike=True       # 股票模式
@@ -58,6 +58,7 @@ class Break30Retrace5Strategy(bt.Strategy):
         # 无持仓时，寻找入场信号
         if not self.getposition(self.datas[0]).size:
             # 1. 先满足突破30日均线条件（前一交易日未破，当前交易日突破）
+            print(f'self.datas[0].close[-1]: {self.datas[0].close[-1]}')
             break_30 = (self.datas[0].close[-1] <= self.ma30[-1]) and (self.datas[0].close[0] > self.ma30[0])
             if break_30:
                 # 2. 突破后回踩5日均线（收盘价在5日均线±1%内，或最低价触及5日均线）
@@ -67,6 +68,7 @@ class Break30Retrace5Strategy(bt.Strategy):
                 if retrace_ma5 and self.ma30_trend[0]:
                     # 计算可买入仓位（总资金×最大仓位比例÷当前股价）
                     target_size = (self.broker.getvalue() * self.p.max_pos_ratio) // self.datas[0].close[0]
+                    print(f'target_size: {target_size}')
                     if target_size > 0:
                         self.buy(size=target_size)
                         self.entry_price = self.datas[0].close[0]
@@ -99,11 +101,12 @@ if __name__ == '__main__':
     # 添加策略
     cerebro.addstrategy(Break30Retrace5Strategy)
     # 添加股票数据（2018-2023年数据，可调整时间范围）
-    stock_data = get_stock_data(ts_code='600519.SH', start_date='20180101', end_date='20231231')
+    stock_data = get_stock_data(ts_code='600519.SH', start_date='20250701', end_date='20251031')
     cerebro.adddata(stock_data)
-    # 初始资金设置（10万元）
-    cerebro.broker.setcash(100000.0)
-    # 交易成本设置（A股：佣金0.02%，印花税0.1%仅卖出时收取）
+    # 初始资金设置（10的6次方=1,000,000 元）
+    INIT_CASH = 10**6
+    cerebro.broker.setcash(INIT_CASH)
+    # 交易成本设置（A股：佣金0.03%，印花税0.1%仅卖出时收取）
     cerebro.broker.addcommissioninfo(AShareCommission())
     # 显示初始资金
     print(f'初始资金：{cerebro.broker.getvalue():.2f} 元')
@@ -111,6 +114,6 @@ if __name__ == '__main__':
     cerebro.run()
     # 显示回测结果
     print(f'回测结束资金：{cerebro.broker.getvalue():.2f} 元')
-    print(f'累计收益：{(cerebro.broker.getvalue() - 100000) / 100000 * 100:.2f}%')
+    print(f'累计收益：{(cerebro.broker.getvalue() - INIT_CASH) / INIT_CASH * 100:.2f}%')
     # 绘制回测图表（K线、均线、买卖信号）
-    cerebro.plot(style='candle')
+    # cerebro.plot(style='candle')

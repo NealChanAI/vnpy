@@ -102,6 +102,7 @@ class MACDBottomDeviationStrategy(bt.Strategy):
 def get_stock_data(ts_code, start_date, end_date):
     df = pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
     df = df.sort_values('trade_date')  # 按日期排序
+    print(f'sort之后\n {df.head(10)}')
     # 转换为Backtrader所需格式（日期索引，列名对应open/high/low/close/volume）
     df['trade_date'] = pd.to_datetime(df['trade_date'])
     df.set_index('trade_date', inplace=True)
@@ -109,7 +110,8 @@ def get_stock_data(ts_code, start_date, end_date):
     # Tushare的vol单位是手，backtrader需要股数
     df['Volume'] = df['Volume'] * 100
     df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
-    df = df.iloc[::-1] # Tushare数据是降序的，需要反转为升序
+    # df = df.iloc[::-1] # Tushare数据是降序的，需要反转为升序
+    print(f'iloc之后\n {df.head(10)}')
     return bt.feeds.PandasData(dataname=df)
 
 if __name__ == '__main__':
@@ -122,13 +124,14 @@ if __name__ == '__main__':
     # 添加策略
     cerebro.addstrategy(MACDBottomDeviationStrategy)
     # 初始资金
-    cerebro.broker.setcash(100000.0)
+    INIT_CASH = 100000
+    cerebro.broker.setcash(INIT_CASH)
     # 添加佣金
     cerebro.broker.addcommissioninfo(AShareCommission())
     # 运行回测
     print('初始资金：%.2f' % cerebro.broker.getvalue())
     cerebro.run()
     print('回测结束资金：%.2f' % cerebro.broker.getvalue())
-    print(f'累计收益：{(cerebro.broker.getvalue() - 100000) / 100000 * 100:.2f}%')
+    print(f'累计收益：{(cerebro.broker.getvalue() - INIT_CASH) / INIT_CASH * 100:.2f}%')
     # 绘制回测曲线
-    cerebro.plot()
+    # cerebro.plot()
